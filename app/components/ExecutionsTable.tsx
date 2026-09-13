@@ -5,6 +5,13 @@ function formatTimestamp(value: string) {
   return new Date(value).toLocaleString();
 }
 
+const STATUS_COLORS: Record<Execution["status"], string> = {
+  QUEUED: "text-foreground/60",
+  RUNNING: "text-blue-600",
+  SUCCESS: "text-green-600",
+  FAILED: "text-red-600",
+};
+
 export function ExecutionsTable({
   executions,
   showJob = false,
@@ -37,7 +44,11 @@ export function ExecutionsTable({
                 </Link>
               </td>
             )}
-            <td className="py-3 pr-4">{execution.status}</td>
+            <td className={`py-3 pr-4 font-medium ${STATUS_COLORS[execution.status]}`}>
+              <Link href={`/executions/${execution.id}`} className="underline">
+                {execution.status}
+              </Link>
+            </td>
             <td className="py-3 pr-4">{execution.triggerType}</td>
             <td className="py-3 pr-4">{formatTimestamp(execution.queuedAt)}</td>
             <td className="py-3 pr-4">{execution.attempt}</td>

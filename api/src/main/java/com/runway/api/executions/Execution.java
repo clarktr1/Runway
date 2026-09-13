@@ -69,6 +69,20 @@ public class Execution {
         this.queuedAt = Instant.now();
     }
 
+    public void markRunning(UUID workerId) {
+        this.workerId = workerId;
+        this.status = ExecutionStatus.RUNNING;
+        this.startedAt = Instant.now();
+    }
+
+    public void markCompleted(ExecutionStatus status, Integer exitCode, String errorMessage) {
+        this.status = status;
+        this.exitCode = exitCode;
+        this.errorMessage = errorMessage;
+        this.completedAt = Instant.now();
+        this.durationMs = startedAt != null ? completedAt.toEpochMilli() - startedAt.toEpochMilli() : null;
+    }
+
     public UUID getId() {
         return id;
     }

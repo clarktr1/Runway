@@ -18,7 +18,7 @@ export type Job = {
 
 export type TriggerType = "SCHEDULED" | "MANUAL";
 
-export type ExecutionStatus = "QUEUED";
+export type ExecutionStatus = "QUEUED" | "RUNNING" | "SUCCESS" | "FAILED";
 
 export type Execution = {
   id: string;
@@ -34,6 +34,14 @@ export type Execution = {
   exitCode: number | null;
   errorMessage: string | null;
   durationMs: number | null;
+};
+
+export type LogStream = "STDOUT" | "STDERR" | "SYSTEM";
+
+export type ExecutionLog = {
+  stream: LogStream;
+  message: string;
+  createdAt: string;
 };
 
 export type Page<T> = {

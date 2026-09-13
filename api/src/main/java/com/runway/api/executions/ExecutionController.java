@@ -1,7 +1,9 @@
 package com.runway.api.executions;
 
 import com.runway.api.auth.AuthPrincipal;
+import com.runway.api.executions.dto.ExecutionLogResponse;
 import com.runway.api.executions.dto.ExecutionResponse;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -33,6 +35,18 @@ public class ExecutionController {
             @RequestParam(defaultValue = "20") int size) {
         Pageable pageable = PageRequest.of(page, size);
         return executionService.search(principal.organizationId(), jobId, status, pageable);
+    }
+
+    @GetMapping("/api/executions/{id}")
+    public ExecutionResponse get(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable UUID id) {
+        return executionService.get(id, principal.organizationId());
+    }
+
+    @GetMapping("/api/executions/{id}/logs")
+    public List<ExecutionLogResponse> logs(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable UUID id) {
+        return executionService.getLogs(id, principal.organizationId()).stream()
+                .map(ExecutionLogResponse::from)
+                .toList();
     }
 
     @PostMapping("/api/jobs/{jobId}/run")
