@@ -22,18 +22,21 @@ public class ExecutionService {
     private final JobRepository jobRepository;
     private final ExecutionQueueService executionQueueService;
     private final CancellationRegistry cancellationRegistry;
+    private final ExecutionEventPublisher executionEventPublisher;
 
     public ExecutionService(
             ExecutionRepository executionRepository,
             ExecutionLogRepository executionLogRepository,
             JobRepository jobRepository,
             ExecutionQueueService executionQueueService,
-            CancellationRegistry cancellationRegistry) {
+            CancellationRegistry cancellationRegistry,
+            ExecutionEventPublisher executionEventPublisher) {
         this.executionRepository = executionRepository;
         this.executionLogRepository = executionLogRepository;
         this.jobRepository = jobRepository;
         this.executionQueueService = executionQueueService;
         this.cancellationRegistry = cancellationRegistry;
+        this.executionEventPublisher = executionEventPublisher;
     }
 
     public Page<ExecutionResponse> search(UUID organizationId, UUID jobId, ExecutionStatus status, Pageable pageable) {
@@ -75,6 +78,7 @@ public class ExecutionService {
     public void markRunning(UUID executionId, UUID workerId) {
         Execution execution = executionRepository.findById(executionId).orElseThrow();
         execution.markRunning(workerId);
+        executionEventPublisher.publishStatus(executionId, ExecutionResponse.from(execution));
     }
 
     @Transactional
@@ -89,6 +93,8 @@ public class ExecutionService {
         if (status == ExecutionStatus.FAILED || status == ExecutionStatus.TIMEOUT) {
             scheduleRetryIfEligible(execution);
         }
+        executionEventPublisher.publishStatus(executionId, ExecutionResponse.from(execution));
+        executionEventPublisher.complete(executionId);
     }
 
     @Transactional
@@ -113,7 +119,11 @@ public class ExecutionService {
                 .findByIdAndJob_OrganizationId(executionId, organizationId)
                 .orElseThrow(() -> new NotFoundException("Execution not found"));
         switch (execution.getStatus()) {
-            case QUEUED -> execution.markCancelled();
+            case QUEUED -> {
+                execution.markCancelled();
+                executionEventPublisher.publishStatus(executionId, ExecutionResponse.from(execution));
+                executionEventPublisher.complete(executionId);
+            }
             case RUNNING -> {
                 if (!cancellationRegistry.cancel(executionId)) {
                     throw new BadRequestException("Execution is not running on this worker instance");

@@ -1,6 +1,7 @@
 package com.runway.api.worker;
 
 import com.runway.api.queue.ExecutionQueueService;
+import com.runway.api.worker.dto.WorkerResponse;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.time.Duration;
@@ -21,6 +22,7 @@ public class WorkerService {
     private final ExecutionQueueService executionQueueService;
     private final ExecutionRunner executionRunner;
     private final WorkerRepository workerRepository;
+    private final WorkerEventPublisher workerEventPublisher;
     private final UUID workerId = UUID.randomUUID();
     private final AtomicInteger busyCount = new AtomicInteger(0);
 
@@ -30,15 +32,18 @@ public class WorkerService {
     public WorkerService(
             ExecutionQueueService executionQueueService,
             ExecutionRunner executionRunner,
-            WorkerRepository workerRepository) {
+            WorkerRepository workerRepository,
+            WorkerEventPublisher workerEventPublisher) {
         this.executionQueueService = executionQueueService;
         this.executionRunner = executionRunner;
         this.workerRepository = workerRepository;
+        this.workerEventPublisher = workerEventPublisher;
     }
 
     @PostConstruct
     void start() {
-        workerRepository.save(new Worker(workerId, WorkerStatus.HEALTHY));
+        Worker worker = workerRepository.save(new Worker(workerId, WorkerStatus.HEALTHY));
+        workerEventPublisher.publish(WorkerResponse.from(worker));
         pollThread = new Thread(this::pollLoop, "runway-worker-" + workerId);
         pollThread.setDaemon(true);
         pollThread.start();
@@ -54,6 +59,7 @@ public class WorkerService {
         workerRepository.findById(workerId).ifPresent(worker -> {
             worker.heartbeat(WorkerStatus.OFFLINE);
             workerRepository.save(worker);
+            workerEventPublisher.publish(WorkerResponse.from(worker));
         });
     }
 
@@ -62,6 +68,7 @@ public class WorkerService {
         workerRepository.findById(workerId).ifPresent(worker -> {
             worker.heartbeat(busyCount.get() > 0 ? WorkerStatus.BUSY : WorkerStatus.HEALTHY);
             workerRepository.save(worker);
+            workerEventPublisher.publish(WorkerResponse.from(worker));
         });
     }
 

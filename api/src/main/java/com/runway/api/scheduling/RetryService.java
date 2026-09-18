@@ -1,7 +1,9 @@
 package com.runway.api.scheduling;
 
 import com.runway.api.executions.Execution;
+import com.runway.api.executions.ExecutionEventPublisher;
 import com.runway.api.executions.ExecutionRepository;
+import com.runway.api.executions.dto.ExecutionResponse;
 import com.runway.api.queue.ExecutionQueueService;
 import java.time.Instant;
 import java.util.UUID;
@@ -16,10 +18,15 @@ public class RetryService {
 
     private final ExecutionRepository executionRepository;
     private final ExecutionQueueService executionQueueService;
+    private final ExecutionEventPublisher executionEventPublisher;
 
-    public RetryService(ExecutionRepository executionRepository, ExecutionQueueService executionQueueService) {
+    public RetryService(
+            ExecutionRepository executionRepository,
+            ExecutionQueueService executionQueueService,
+            ExecutionEventPublisher executionEventPublisher) {
         this.executionRepository = executionRepository;
         this.executionQueueService = executionQueueService;
+        this.executionEventPublisher = executionEventPublisher;
     }
 
     @Scheduled(fixedDelayString = "${runway.scheduler.interval-ms:5000}")
@@ -29,6 +36,7 @@ public class RetryService {
         for (UUID executionId : executionRepository.findDueRetryExecutionIdsForUpdate(now)) {
             Execution execution = executionRepository.findById(executionId).orElseThrow();
             execution.promoteToQueued();
+            executionEventPublisher.publishStatus(executionId, ExecutionResponse.from(execution));
             executionQueueService.enqueueAfterCommit(executionId);
         }
     }
