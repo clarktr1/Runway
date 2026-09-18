@@ -21,9 +21,9 @@ const CANCELLABLE_STATUSES: Execution["status"][] = ["QUEUED", "RUNNING"];
 const TERMINAL_STATUSES: Execution["status"][] = ["SUCCESS", "FAILED", "TIMEOUT", "CANCELLED"];
 
 const STREAM_COLORS: Record<ExecutionLog["stream"], string> = {
-  STDOUT: "text-foreground",
-  STDERR: "text-red-600",
-  SYSTEM: "text-foreground/50",
+  STDOUT: "text-gray-100",
+  STDERR: "text-red-400",
+  SYSTEM: "text-gray-400",
 };
 
 export function ExecutionDetail({
