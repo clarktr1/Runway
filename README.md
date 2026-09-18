@@ -1,5 +1,18 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Running with Docker
+
+The whole stack (Postgres, Redis, the Spring Boot API, and this frontend)
+can run in containers via Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+Then open [http://localhost:3000](http://localhost:3000). Postgres data
+persists across restarts in a named volume; run `docker compose down -v` to
+also wipe it.
+
 ## Getting Started
 
 First, run the development server:
