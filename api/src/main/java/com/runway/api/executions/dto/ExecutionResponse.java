@@ -19,7 +19,8 @@ public record ExecutionResponse(
         Instant completedAt,
         Integer exitCode,
         String errorMessage,
-        Long durationMs) {
+        Long durationMs,
+        Instant nextAttemptAt) {
 
     public static ExecutionResponse from(Execution execution) {
         return new ExecutionResponse(
@@ -35,6 +36,7 @@ public record ExecutionResponse(
                 execution.getCompletedAt(),
                 execution.getExitCode(),
                 execution.getErrorMessage(),
-                execution.getDurationMs());
+                execution.getDurationMs(),
+                execution.getNextAttemptAt());
     }
 }

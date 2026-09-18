@@ -1,5 +1,6 @@
 package com.runway.api.executions;
 
+import com.runway.api.common.BadRequestException;
 import com.runway.api.common.NotFoundException;
 import com.runway.api.executions.dto.ExecutionResponse;
 import com.runway.api.jobs.Job;
@@ -12,8 +13,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class ExecutionService {
@@ -22,16 +21,19 @@ public class ExecutionService {
     private final ExecutionLogRepository executionLogRepository;
     private final JobRepository jobRepository;
     private final ExecutionQueueService executionQueueService;
+    private final CancellationRegistry cancellationRegistry;
 
     public ExecutionService(
             ExecutionRepository executionRepository,
             ExecutionLogRepository executionLogRepository,
             JobRepository jobRepository,
-            ExecutionQueueService executionQueueService) {
+            ExecutionQueueService executionQueueService,
+            CancellationRegistry cancellationRegistry) {
         this.executionRepository = executionRepository;
         this.executionLogRepository = executionLogRepository;
         this.jobRepository = jobRepository;
         this.executionQueueService = executionQueueService;
+        this.cancellationRegistry = cancellationRegistry;
     }
 
     public Page<ExecutionResponse> search(UUID organizationId, UUID jobId, ExecutionStatus status, Pageable pageable) {
@@ -59,14 +61,14 @@ public class ExecutionService {
                 .orElseThrow(() -> new NotFoundException("Job not found"));
 
         Execution execution = executionRepository.save(new Execution(job, TriggerType.MANUAL));
-        enqueueAfterCommit(execution.getId());
+        executionQueueService.enqueueAfterCommit(execution.getId());
         return ExecutionResponse.from(execution);
     }
 
     @Transactional
     public void enqueueScheduled(Job job) {
         Execution execution = executionRepository.save(new Execution(job, TriggerType.SCHEDULED));
-        enqueueAfterCommit(execution.getId());
+        executionQueueService.enqueueAfterCommit(execution.getId());
     }
 
     @Transactional
@@ -84,19 +86,59 @@ public class ExecutionService {
             executionLogRepository.save(
                     new ExecutionLog(execution, logLine.stream(), logLine.message(), logLine.timestamp()));
         }
+        if (status == ExecutionStatus.FAILED || status == ExecutionStatus.TIMEOUT) {
+            scheduleRetryIfEligible(execution);
+        }
     }
 
-    private void enqueueAfterCommit(UUID executionId) {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    executionQueueService.enqueue(executionId);
-                }
-            });
-        } else {
-            executionQueueService.enqueue(executionId);
+    @Transactional
+    public ExecutionResponse retryFromFailure(UUID executionId, UUID organizationId) {
+        Execution execution = executionRepository
+                .findByIdAndJob_OrganizationId(executionId, organizationId)
+                .orElseThrow(() -> new NotFoundException("Execution not found"));
+        if (execution.getStatus() != ExecutionStatus.FAILED
+                && execution.getStatus() != ExecutionStatus.TIMEOUT
+                && execution.getStatus() != ExecutionStatus.CANCELLED) {
+            throw new BadRequestException("Only a failed, timed out, or cancelled execution can be retried");
         }
+        Execution retry =
+                executionRepository.save(Execution.retryOf(execution, TriggerType.RETRY, ExecutionStatus.QUEUED, null));
+        executionQueueService.enqueueAfterCommit(retry.getId());
+        return ExecutionResponse.from(retry);
+    }
+
+    @Transactional
+    public ExecutionResponse cancel(UUID executionId, UUID organizationId) {
+        Execution execution = executionRepository
+                .findByIdAndJob_OrganizationId(executionId, organizationId)
+                .orElseThrow(() -> new NotFoundException("Execution not found"));
+        switch (execution.getStatus()) {
+            case QUEUED -> execution.markCancelled();
+            case RUNNING -> {
+                if (!cancellationRegistry.cancel(executionId)) {
+                    throw new BadRequestException("Execution is not running on this worker instance");
+                }
+            }
+            default -> throw new BadRequestException("Execution is not cancellable");
+        }
+        return ExecutionResponse.from(execution);
+    }
+
+    @Transactional
+    public void failStaleRunningExecutionsForWorker(UUID workerId) {
+        for (Execution execution : executionRepository.findByWorkerIdAndStatus(workerId, ExecutionStatus.RUNNING)) {
+            complete(execution.getId(), ExecutionStatus.FAILED, null, "Worker " + workerId + " went offline", List.of());
+        }
+    }
+
+    private void scheduleRetryIfEligible(Execution execution) {
+        RetryPolicy policy = RetryPolicy.from(execution.getJob().getRetryPolicy());
+        if (execution.getAttempt() >= policy.maxAttempts()) {
+            return;
+        }
+        Instant nextAttemptAt = Instant.now().plus(policy.delayForNextAttempt(execution.getAttempt()));
+        executionRepository.save(
+                Execution.retryOf(execution, TriggerType.RETRY, ExecutionStatus.RETRYING, nextAttemptAt));
     }
 
     public record LogLine(LogStream stream, String message, Instant timestamp) {

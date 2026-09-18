@@ -2,13 +2,22 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { apiFetch, ApiError } from "@/app/lib/api";
 import type { Execution, ExecutionLog } from "@/app/lib/types";
+import { RetryExecutionButton } from "@/app/components/RetryExecutionButton";
+import { CancelExecutionButton } from "@/app/components/CancelExecutionButton";
+import { retryExecutionAction, cancelExecutionAction } from "@/app/lib/actions/executions";
 
 const STATUS_COLORS: Record<Execution["status"], string> = {
   QUEUED: "text-foreground/60",
   RUNNING: "text-blue-600",
   SUCCESS: "text-green-600",
   FAILED: "text-red-600",
+  TIMEOUT: "text-orange-600",
+  CANCELLED: "text-foreground/60",
+  RETRYING: "text-orange-600",
 };
+
+const RETRYABLE_STATUSES: Execution["status"][] = ["FAILED", "TIMEOUT", "CANCELLED"];
+const CANCELLABLE_STATUSES: Execution["status"][] = ["QUEUED", "RUNNING"];
 
 const STREAM_COLORS: Record<ExecutionLog["stream"], string> = {
   STDOUT: "text-foreground",
@@ -31,13 +40,22 @@ export default async function ExecutionDetailPage({ params }: { params: Promise<
 
   const logs = await apiFetch<ExecutionLog[]>(`/api/executions/${id}/logs`);
 
+  const boundRetry = retryExecutionAction.bind(null, execution.id, execution.jobId);
+  const boundCancel = cancelExecutionAction.bind(null, execution.id, execution.jobId);
+
   return (
     <div className="flex max-w-3xl flex-col gap-6">
-      <div>
-        <Link href={`/jobs/${execution.jobId}`} className="text-sm text-foreground/60 underline">
-          {execution.jobName}
-        </Link>
-        <h1 className={`text-2xl font-semibold ${STATUS_COLORS[execution.status]}`}>{execution.status}</h1>
+      <div className="flex items-center justify-between">
+        <div>
+          <Link href={`/jobs/${execution.jobId}`} className="text-sm text-foreground/60 underline">
+            {execution.jobName}
+          </Link>
+          <h1 className={`text-2xl font-semibold ${STATUS_COLORS[execution.status]}`}>{execution.status}</h1>
+        </div>
+        <div className="flex items-center gap-3">
+          {RETRYABLE_STATUSES.includes(execution.status) && <RetryExecutionButton action={boundRetry} />}
+          {CANCELLABLE_STATUSES.includes(execution.status) && <CancelExecutionButton action={boundCancel} />}
+        </div>
       </div>
 
       <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
@@ -73,6 +91,12 @@ export default async function ExecutionDetailPage({ params }: { params: Promise<
           <dt className="text-foreground/60">Duration</dt>
           <dd>{execution.durationMs !== null ? `${(execution.durationMs / 1000).toFixed(1)}s` : "—"}</dd>
         </div>
+        {execution.nextAttemptAt && (
+          <div>
+            <dt className="text-foreground/60">Next Attempt</dt>
+            <dd>{new Date(execution.nextAttemptAt).toLocaleString()}</dd>
+          </div>
+        )}
       </dl>
 
       {execution.errorMessage && (

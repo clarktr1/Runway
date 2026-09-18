@@ -1,16 +1,21 @@
 package com.runway.api.worker;
 
+import com.runway.api.executions.CancellationToken;
 import com.runway.api.executions.ExecutionService.LogLine;
 import com.runway.api.executions.LogStream;
 import com.runway.api.jobs.Job;
 import com.runway.api.jobs.JobType;
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +30,7 @@ public class HttpJobExecutor implements JobExecutor {
     }
 
     @Override
-    public Outcome execute(Job job, Consumer<LogLine> logSink) {
+    public Outcome execute(Job job, Consumer<LogLine> logSink, CancellationToken cancellationToken) {
         Map<String, Object> configuration = job.getConfiguration();
         String method = String.valueOf(configuration.getOrDefault("method", "GET")).toUpperCase();
         String url = String.valueOf(configuration.get("url"));
@@ -44,21 +49,37 @@ public class HttpJobExecutor implements JobExecutor {
         }
 
         logSink.accept(new LogLine(LogStream.SYSTEM, method + " " + url, Instant.now()));
+
+        CompletableFuture<HttpResponse<String>> future =
+                httpClient.sendAsync(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+        cancellationToken.bind(() -> future.cancel(true));
+
         try {
-            HttpResponse<String> response =
-                    httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = job.getTimeoutSeconds() != null
+                    ? future.get(job.getTimeoutSeconds(), TimeUnit.SECONDS)
+                    : future.get();
             logSink.accept(new LogLine(LogStream.STDOUT, "HTTP " + response.statusCode(), Instant.now()));
             if (!response.body().isBlank()) {
                 logSink.accept(new LogLine(LogStream.STDOUT, response.body(), Instant.now()));
             }
             boolean success = response.statusCode() >= 200 && response.statusCode() < 300;
-            return new Outcome(success, response.statusCode(), success ? null : "HTTP " + response.statusCode());
-        } catch (IOException e) {
-            logSink.accept(new LogLine(LogStream.SYSTEM, "Request failed: " + e.getMessage(), Instant.now()));
-            return new Outcome(false, null, e.getMessage());
+            return new Outcome(
+                    success ? Result.SUCCESS : Result.FAILED,
+                    response.statusCode(),
+                    success ? null : "HTTP " + response.statusCode());
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            logSink.accept(new LogLine(LogStream.SYSTEM, "Request exceeded timeout", Instant.now()));
+            return new Outcome(Result.TIMEOUT, null, "Request exceeded timeout of " + job.getTimeoutSeconds() + "s");
+        } catch (CancellationException e) {
+            return new Outcome(Result.CANCELLED, null, "Execution cancelled");
+        } catch (ExecutionException e) {
+            String message = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
+            logSink.accept(new LogLine(LogStream.SYSTEM, "Request failed: " + message, Instant.now()));
+            return new Outcome(Result.FAILED, null, message);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return new Outcome(false, null, "Execution interrupted");
+            return new Outcome(Result.FAILED, null, "Execution interrupted");
         }
     }
 }

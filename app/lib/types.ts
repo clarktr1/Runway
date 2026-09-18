@@ -16,9 +16,16 @@ export type Job = {
   updatedAt: string;
 };
 
-export type TriggerType = "SCHEDULED" | "MANUAL";
+export type TriggerType = "SCHEDULED" | "MANUAL" | "RETRY";
 
-export type ExecutionStatus = "QUEUED" | "RUNNING" | "SUCCESS" | "FAILED";
+export type ExecutionStatus =
+  | "QUEUED"
+  | "RUNNING"
+  | "SUCCESS"
+  | "FAILED"
+  | "TIMEOUT"
+  | "CANCELLED"
+  | "RETRYING";
 
 export type Execution = {
   id: string;
@@ -34,6 +41,16 @@ export type Execution = {
   exitCode: number | null;
   errorMessage: string | null;
   durationMs: number | null;
+  nextAttemptAt: string | null;
+};
+
+export type WorkerStatus = "STARTING" | "HEALTHY" | "BUSY" | "OFFLINE";
+
+export type Worker = {
+  id: string;
+  status: WorkerStatus;
+  startedAt: string;
+  lastHeartbeatAt: string;
 };
 
 export type LogStream = "STDOUT" | "STDERR" | "SYSTEM";

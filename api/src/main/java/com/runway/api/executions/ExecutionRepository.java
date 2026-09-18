@@ -1,5 +1,7 @@
 package com.runway.api.executions;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -21,4 +23,15 @@ public interface ExecutionRepository extends JpaRepository<Execution, UUID> {
             @Param("jobId") UUID jobId,
             @Param("status") ExecutionStatus status,
             Pageable pageable);
+
+    long countByJob_IdAndStatus(UUID jobId, ExecutionStatus status);
+
+    List<Execution> findByWorkerIdAndStatus(UUID workerId, ExecutionStatus status);
+
+    @Query(
+            value = "select id from executions "
+                    + "where status = 'RETRYING' and next_attempt_at <= :now "
+                    + "order by next_attempt_at for update skip locked",
+            nativeQuery = true)
+    List<UUID> findDueRetryExecutionIdsForUpdate(@Param("now") Instant now);
 }

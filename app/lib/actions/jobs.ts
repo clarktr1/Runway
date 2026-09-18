@@ -22,6 +22,13 @@ function buildJobRequest(formData: FormData) {
   const timeoutSeconds = String(formData.get("timeoutSeconds") ?? "").trim();
   const cronExpression = String(formData.get("cronExpression") ?? "").trim();
 
+  const retryPolicy = {
+    maxAttempts: Number(formData.get("retryMaxAttempts") ?? "1"),
+    strategy: String(formData.get("retryStrategy") ?? "FIXED"),
+    initialDelaySeconds: Number(formData.get("retryInitialDelaySeconds") ?? "30"),
+    maxDelaySeconds: Number(formData.get("retryMaxDelaySeconds") ?? "600"),
+  };
+
   return {
     name: String(formData.get("name") ?? ""),
     description: String(formData.get("description") ?? "") || null,
@@ -30,7 +37,7 @@ function buildJobRequest(formData: FormData) {
     enabled: formData.get("enabled") === "on",
     timeoutSeconds: timeoutSeconds ? Number(timeoutSeconds) : null,
     maxConcurrency: Number(formData.get("maxConcurrency") ?? "1"),
-    retryPolicy: {},
+    retryPolicy,
     cronExpression: cronExpression || null,
   };
 }

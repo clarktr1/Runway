@@ -8,3 +8,17 @@ export async function runJobAction(jobId: string) {
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/executions");
 }
+
+export async function retryExecutionAction(executionId: string, jobId: string) {
+  await apiFetch(`/api/executions/${executionId}/retry`, { method: "POST" });
+  revalidatePath(`/executions/${executionId}`);
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath("/executions");
+}
+
+export async function cancelExecutionAction(executionId: string, jobId: string) {
+  await apiFetch(`/api/executions/${executionId}/cancel`, { method: "POST" });
+  revalidatePath(`/executions/${executionId}`);
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath("/executions");
+}

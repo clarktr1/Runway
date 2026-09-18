@@ -5,6 +5,8 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class ExecutionQueueService {
@@ -19,6 +21,19 @@ public class ExecutionQueueService {
 
     public void enqueue(UUID executionId) {
         redisTemplate.opsForList().leftPush(QUEUE_KEY, executionId.toString());
+    }
+
+    public void enqueueAfterCommit(UUID executionId) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    enqueue(executionId);
+                }
+            });
+        } else {
+            enqueue(executionId);
+        }
     }
 
     public Optional<UUID> poll(Duration timeout) {

@@ -54,4 +54,15 @@ public class ExecutionController {
     public ExecutionResponse run(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable UUID jobId) {
         return executionService.triggerManual(jobId, principal.organizationId());
     }
+
+    @PostMapping("/api/executions/{id}/retry")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ExecutionResponse retry(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable UUID id) {
+        return executionService.retryFromFailure(id, principal.organizationId());
+    }
+
+    @PostMapping("/api/executions/{id}/cancel")
+    public ExecutionResponse cancel(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable UUID id) {
+        return executionService.cancel(id, principal.organizationId());
+    }
 }

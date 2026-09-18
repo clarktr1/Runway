@@ -1,5 +1,6 @@
 package com.runway.api.worker;
 
+import com.runway.api.executions.CancellationToken;
 import com.runway.api.executions.ExecutionService.LogLine;
 import com.runway.api.jobs.Job;
 import com.runway.api.jobs.JobType;
@@ -9,8 +10,15 @@ public interface JobExecutor {
 
     JobType supports();
 
-    Outcome execute(Job job, Consumer<LogLine> logSink);
+    Outcome execute(Job job, Consumer<LogLine> logSink, CancellationToken cancellationToken);
 
-    record Outcome(boolean success, Integer exitCode, String errorMessage) {
+    enum Result {
+        SUCCESS,
+        FAILED,
+        TIMEOUT,
+        CANCELLED
+    }
+
+    record Outcome(Result result, Integer exitCode, String errorMessage) {
     }
 }

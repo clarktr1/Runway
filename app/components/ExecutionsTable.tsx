@@ -10,6 +10,9 @@ const STATUS_COLORS: Record<Execution["status"], string> = {
   RUNNING: "text-blue-600",
   SUCCESS: "text-green-600",
   FAILED: "text-red-600",
+  TIMEOUT: "text-orange-600",
+  CANCELLED: "text-foreground/60",
+  RETRYING: "text-orange-600",
 };
 
 export function ExecutionsTable({

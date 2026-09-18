@@ -20,6 +20,12 @@ export function JobForm({ action, submitLabel, initialValues, confirmMessage }: 
   const method = initialValues?.type === "HTTP" ? String(initialValues.configuration.method ?? "GET") : "GET";
   const url = initialValues?.type === "HTTP" ? String(initialValues.configuration.url ?? "") : "";
 
+  const retryPolicy = initialValues?.retryPolicy ?? {};
+  const maxAttempts = Number(retryPolicy.maxAttempts ?? 1);
+  const retryStrategy = String(retryPolicy.strategy ?? "FIXED");
+  const initialDelaySeconds = Number(retryPolicy.initialDelaySeconds ?? 30);
+  const maxDelaySeconds = Number(retryPolicy.maxDelaySeconds ?? 600);
+
   return (
     <form
       action={formAction}
@@ -135,6 +141,55 @@ export function JobForm({ action, submitLabel, initialValues, confirmMessage }: 
           />
         </label>
       </div>
+
+      <fieldset className="flex flex-col gap-3 rounded-md border border-foreground/15 p-3">
+        <legend className="px-1 text-sm font-medium">Retry Policy</legend>
+        <div className="flex gap-3">
+          <label className="flex flex-1 flex-col gap-1">
+            <span className="text-sm font-medium">Max Attempts</span>
+            <input
+              name="retryMaxAttempts"
+              type="number"
+              min={1}
+              defaultValue={maxAttempts}
+              className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 focus:border-primary focus:outline-none"
+            />
+          </label>
+          <label className="flex flex-1 flex-col gap-1">
+            <span className="text-sm font-medium">Strategy</span>
+            <select
+              name="retryStrategy"
+              defaultValue={retryStrategy}
+              className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 focus:border-primary focus:outline-none"
+            >
+              <option value="FIXED">Fixed</option>
+              <option value="EXPONENTIAL">Exponential Backoff</option>
+            </select>
+          </label>
+        </div>
+        <div className="flex gap-3">
+          <label className="flex flex-1 flex-col gap-1">
+            <span className="text-sm font-medium">Initial Delay (seconds)</span>
+            <input
+              name="retryInitialDelaySeconds"
+              type="number"
+              min={0}
+              defaultValue={initialDelaySeconds}
+              className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 focus:border-primary focus:outline-none"
+            />
+          </label>
+          <label className="flex flex-1 flex-col gap-1">
+            <span className="text-sm font-medium">Max Delay (seconds)</span>
+            <input
+              name="retryMaxDelaySeconds"
+              type="number"
+              min={0}
+              defaultValue={maxDelaySeconds}
+              className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 focus:border-primary focus:outline-none"
+            />
+          </label>
+        </div>
+      </fieldset>
 
       <label className="flex items-center gap-2">
         <input
