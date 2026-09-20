@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { apiFetch, ApiError } from "@/app/lib/api";
-import type { Execution, Job, Page } from "@/app/lib/types";
+import type { Execution, Job, Page, RemoteHost } from "@/app/lib/types";
 import { JobForm } from "@/app/components/JobForm";
 import { DeleteJobButton } from "@/app/components/DeleteJobButton";
 import { RunJobButton } from "@/app/components/RunJobButton";
@@ -22,6 +22,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   }
 
   const executions = await apiFetch<Page<Execution>>(`/api/executions?jobId=${id}&size=10`);
+  const remoteHosts = await apiFetch<RemoteHost[]>("/api/remote-hosts");
 
   const boundUpdate = updateJobAction.bind(null, id);
   const boundDelete = deleteJobAction.bind(null, id);
@@ -46,6 +47,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
         submitLabel="Save Changes"
         initialValues={job}
         confirmMessage="Save changes to this job?"
+        remoteHosts={remoteHosts}
       />
 
       <div>

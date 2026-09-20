@@ -19,4 +19,11 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
                     + "order by next_run_at for update skip locked",
             nativeQuery = true)
     List<UUID> findDueJobIdsForUpdate(@Param("now") Instant now);
+
+    @Query(
+            value = "select exists(select 1 from jobs where organization_id = :organizationId "
+                    + "and type = 'SSH_COMMAND' and configuration ->> 'remoteHostId' = :remoteHostId)",
+            nativeQuery = true)
+    boolean existsSshCommandJobReferencingRemoteHost(
+            @Param("organizationId") UUID organizationId, @Param("remoteHostId") String remoteHostId);
 }

@@ -58,6 +58,9 @@ public class Execution {
     @Column(name = "duration_ms")
     private Long durationMs;
 
+    @Column(name = "next_attempt_at")
+    private Instant nextAttemptAt;
+
     protected Execution() {
     }
 
@@ -67,6 +70,44 @@ public class Execution {
         this.status = ExecutionStatus.QUEUED;
         this.attempt = 1;
         this.queuedAt = Instant.now();
+    }
+
+    private Execution(Job job, TriggerType triggerType, int attempt, ExecutionStatus status, Instant nextAttemptAt) {
+        this.job = job;
+        this.triggerType = triggerType;
+        this.status = status;
+        this.attempt = attempt;
+        this.queuedAt = Instant.now();
+        this.nextAttemptAt = nextAttemptAt;
+    }
+
+    public static Execution retryOf(
+            Execution previous, TriggerType triggerType, ExecutionStatus initialStatus, Instant nextAttemptAt) {
+        return new Execution(previous.job, triggerType, previous.attempt + 1, initialStatus, nextAttemptAt);
+    }
+
+    public void markRunning(UUID workerId) {
+        this.workerId = workerId;
+        this.status = ExecutionStatus.RUNNING;
+        this.startedAt = Instant.now();
+    }
+
+    public void markCompleted(ExecutionStatus status, Integer exitCode, String errorMessage) {
+        this.status = status;
+        this.exitCode = exitCode;
+        this.errorMessage = errorMessage;
+        this.completedAt = Instant.now();
+        this.durationMs = startedAt != null ? completedAt.toEpochMilli() - startedAt.toEpochMilli() : null;
+    }
+
+    public void markCancelled() {
+        this.status = ExecutionStatus.CANCELLED;
+        this.completedAt = Instant.now();
+    }
+
+    public void promoteToQueued() {
+        this.status = ExecutionStatus.QUEUED;
+        this.nextAttemptAt = null;
     }
 
     public UUID getId() {
@@ -115,5 +156,9 @@ public class Execution {
 
     public Long getDurationMs() {
         return durationMs;
+    }
+
+    public Instant getNextAttemptAt() {
+        return nextAttemptAt;
     }
 }

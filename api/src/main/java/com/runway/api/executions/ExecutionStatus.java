@@ -1,5 +1,11 @@
 package com.runway.api.executions;
 
 public enum ExecutionStatus {
-    QUEUED
+    QUEUED,
+    RUNNING,
+    SUCCESS,
+    FAILED,
+    TIMEOUT,
+    CANCELLED,
+    RETRYING
 }

@@ -17,10 +17,22 @@ function buildJobRequest(formData: FormData) {
   const configuration =
     type === "HTTP"
       ? { method: String(formData.get("method") ?? ""), url: String(formData.get("url") ?? "") }
-      : { command: String(formData.get("command") ?? "") };
+      : type === "SSH_COMMAND"
+        ? {
+            remoteHostId: String(formData.get("remoteHostId") ?? ""),
+            command: String(formData.get("command") ?? ""),
+          }
+        : { command: String(formData.get("command") ?? "") };
 
   const timeoutSeconds = String(formData.get("timeoutSeconds") ?? "").trim();
   const cronExpression = String(formData.get("cronExpression") ?? "").trim();
+
+  const retryPolicy = {
+    maxAttempts: Number(formData.get("retryMaxAttempts") ?? "1"),
+    strategy: String(formData.get("retryStrategy") ?? "FIXED"),
+    initialDelaySeconds: Number(formData.get("retryInitialDelaySeconds") ?? "30"),
+    maxDelaySeconds: Number(formData.get("retryMaxDelaySeconds") ?? "600"),
+  };
 
   return {
     name: String(formData.get("name") ?? ""),
@@ -30,7 +42,7 @@ function buildJobRequest(formData: FormData) {
     enabled: formData.get("enabled") === "on",
     timeoutSeconds: timeoutSeconds ? Number(timeoutSeconds) : null,
     maxConcurrency: Number(formData.get("maxConcurrency") ?? "1"),
-    retryPolicy: {},
+    retryPolicy,
     cronExpression: cronExpression || null,
   };
 }

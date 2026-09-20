@@ -5,6 +5,7 @@ import com.runway.api.common.BadRequestException;
 import com.runway.api.common.NotFoundException;
 import com.runway.api.jobs.dto.JobRequest;
 import com.runway.api.jobs.dto.JobResponse;
+import com.runway.api.remotehosts.RemoteHostRepository;
 import com.runway.api.scheduling.CronService;
 import java.time.Instant;
 import java.util.List;
@@ -19,12 +20,17 @@ public class JobService {
     private final JobRepository jobRepository;
     private final OrganizationRepository organizationRepository;
     private final CronService cronService;
+    private final RemoteHostRepository remoteHostRepository;
 
     public JobService(
-            JobRepository jobRepository, OrganizationRepository organizationRepository, CronService cronService) {
+            JobRepository jobRepository,
+            OrganizationRepository organizationRepository,
+            CronService cronService,
+            RemoteHostRepository remoteHostRepository) {
         this.jobRepository = jobRepository;
         this.organizationRepository = organizationRepository;
         this.cronService = cronService;
+        this.remoteHostRepository = remoteHostRepository;
     }
 
     public List<JobResponse> list(UUID organizationId) {
@@ -39,7 +45,7 @@ public class JobService {
 
     @Transactional
     public JobResponse create(UUID organizationId, JobRequest request) {
-        validateConfiguration(request.type(), request.configuration());
+        validateConfiguration(organizationId, request.type(), request.configuration());
         Instant nextRunAt = computeNextRunAt(request.cronExpression());
 
         Job job = new Job(
@@ -60,7 +66,7 @@ public class JobService {
 
     @Transactional
     public JobResponse update(UUID id, UUID organizationId, JobRequest request) {
-        validateConfiguration(request.type(), request.configuration());
+        validateConfiguration(organizationId, request.type(), request.configuration());
         Instant nextRunAt = computeNextRunAt(request.cronExpression());
 
         Job job = findOwnedJob(id, organizationId);
@@ -102,10 +108,26 @@ public class JobService {
                 .orElseThrow(() -> new NotFoundException("Job not found"));
     }
 
-    private void validateConfiguration(JobType type, Map<String, Object> configuration) {
+    private void validateConfiguration(UUID organizationId, JobType type, Map<String, Object> configuration) {
         switch (type) {
             case SHELL -> requireKeys(configuration, "command");
             case HTTP -> requireKeys(configuration, "method", "url");
+            case SSH_COMMAND -> {
+                requireKeys(configuration, "remoteHostId", "command");
+                validateRemoteHostReference(organizationId, configuration.get("remoteHostId"));
+            }
+        }
+    }
+
+    private void validateRemoteHostReference(UUID organizationId, Object remoteHostId) {
+        UUID id;
+        try {
+            id = UUID.fromString(remoteHostId.toString());
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("configuration.remoteHostId is not a valid id");
+        }
+        if (remoteHostRepository.findByIdAndOrganizationId(id, organizationId).isEmpty()) {
+            throw new BadRequestException("configuration.remoteHostId does not reference a known remote host");
         }
     }
 

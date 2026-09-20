@@ -2,7 +2,7 @@ import { apiFetch } from "@/app/lib/api";
 import type { Execution, ExecutionStatus, Page } from "@/app/lib/types";
 import { ExecutionsTable } from "@/app/components/ExecutionsTable";
 
-const STATUS_OPTIONS: ExecutionStatus[] = ["QUEUED"];
+const STATUS_OPTIONS: ExecutionStatus[] = ["QUEUED", "RUNNING", "SUCCESS", "FAILED"];
 
 export default async function ExecutionsPage({
   searchParams,
