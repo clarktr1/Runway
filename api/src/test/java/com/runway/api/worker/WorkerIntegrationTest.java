@@ -119,7 +119,10 @@ class WorkerIntegrationTest {
 
     private Execution awaitStatus(UUID executionId, ExecutionStatus... targets) throws InterruptedException {
         Set<ExecutionStatus> targetStatuses = Set.of(targets);
-        for (int i = 0; i < 40; i++) {
+        // 30s budget: comfortable locally, but also covers cold-start contention (JVM warmup,
+        // Redis connection pool establishing) on a shared/throttled CI runner for whichever test
+        // happens to run first against a freshly-started worker.
+        for (int i = 0; i < 120; i++) {
             Execution execution = executionRepository.findById(executionId).orElseThrow();
             if (targetStatuses.contains(execution.getStatus())) {
                 return execution;
