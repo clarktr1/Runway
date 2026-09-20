@@ -4,6 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.runway.api.auth.Organization;
 import com.runway.api.auth.OrganizationRepository;
+import com.runway.api.auth.User;
+import com.runway.api.auth.UserRepository;
+import com.runway.api.credentials.CredentialEncryptionService;
+import com.runway.api.credentials.SshCredential;
+import com.runway.api.credentials.SshCredentialRepository;
 import com.runway.api.executions.Execution;
 import com.runway.api.executions.ExecutionLogRepository;
 import com.runway.api.executions.ExecutionRepository;
@@ -14,12 +19,18 @@ import com.runway.api.executions.TriggerType;
 import com.runway.api.jobs.Job;
 import com.runway.api.jobs.JobRepository;
 import com.runway.api.jobs.JobType;
+import com.runway.api.remotehosts.RemoteHost;
+import com.runway.api.remotehosts.RemoteHostRepository;
+import com.runway.api.ssh.PinnedHostKeyVerifier;
+import com.runway.api.ssh.SshKeyParser;
+import com.runway.api.testsupport.EmbeddedSshServer;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import net.schmizz.sshj.SSHClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,12 +63,32 @@ class WorkerIntegrationTest {
     @Autowired
     private ExecutionRunner executionRunner;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private SshCredentialRepository sshCredentialRepository;
+
+    @Autowired
+    private RemoteHostRepository remoteHostRepository;
+
+    @Autowired
+    private CredentialEncryptionService encryptionService;
+
     private Organization organization;
+    private User sshTestUser;
+    private EmbeddedSshServer sshServer;
 
     @AfterEach
-    void cleanUp() {
+    void cleanUp() throws Exception {
+        if (sshServer != null) {
+            sshServer.close();
+        }
         if (organization != null) {
             organizationRepository.deleteById(organization.getId());
+        }
+        if (sshTestUser != null) {
+            userRepository.deleteById(sshTestUser.getId());
         }
     }
 
@@ -204,6 +235,73 @@ class WorkerIntegrationTest {
         assertThat(retry.getStatus()).isEqualTo(ExecutionStatus.RETRYING);
         assertThat(retry.getAttempt()).isEqualTo(2);
         assertThat(retry.getNextAttemptAt()).isNotNull();
+    }
+
+    @Test
+    void sshCommandJobSucceedsThroughTheFullPipeline() throws Exception {
+        String privateKey =
+                """
+                -----BEGIN OPENSSH PRIVATE KEY-----
+                b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+                QyNTUxOQAAACBhcQqEXXrBSLaF6QmSVbHtU7gu/aub9/ik7pivAwCiBgAAAJhstTV+bLU1
+                fgAAAAtzc2gtZWQyNTUxOQAAACBhcQqEXXrBSLaF6QmSVbHtU7gu/aub9/ik7pivAwCiBg
+                AAAED+G5biVjxsRt2rGCaDzNCtrNXgCw3RvgTwAeJuXTIeEWFxCoRdesFItoXpCZJVse1T
+                uC79q5v3+KTumK8DAKIGAAAAD3J1bndheS10ZXN0LWtleQECAwQFBg==
+                -----END OPENSSH PRIVATE KEY-----
+                """;
+        String publicKeyLine =
+                "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGFxCoRdesFItoXpCZJVse1TuC79q5v3+KTumK8DAKIG runway-test-key";
+
+        sshServer = new EmbeddedSshServer("testuser", publicKeyLine);
+        organization = organizationRepository.save(new Organization("SSH Pipeline Test Org"));
+        sshTestUser = userRepository.save(
+                new User("ssh-pipeline-" + System.nanoTime() + "@runway.dev", "unused-hash", "SSH Pipeline User"));
+
+        SshKeyParser.ParsedKey parsedKey = SshKeyParser.parse(privateKey, null);
+        SshCredential credential = sshCredentialRepository.save(new SshCredential(
+                organization,
+                sshTestUser.getId(),
+                "Pipeline Key",
+                encryptionService.encrypt(privateKey),
+                null,
+                parsedKey.fingerprint(),
+                parsedKey.publicKeyPreview()));
+
+        RemoteHost host = new RemoteHost(
+                organization, "Pipeline Host", sshServer.getHostname(), sshServer.getPort(), "testuser", credential);
+        PinnedHostKeyVerifier verifier = new PinnedHostKeyVerifier(null);
+        try (SSHClient client = new SSHClient()) {
+            client.setConnectTimeout(5_000);
+            client.addHostKeyVerifier(verifier);
+            client.connect(host.getHostname(), host.getPort());
+        }
+        host.pin(verifier.getPresentedFingerprint(), verifier.getPresentedAlgorithm());
+        host = remoteHostRepository.save(host);
+
+        Job job = jobRepository.save(new Job(
+                organization,
+                "SSH Pipeline Job",
+                null,
+                JobType.SSH_COMMAND,
+                Map.of("remoteHostId", host.getId().toString(), "command", "/bin/sh -c \"echo pipeline-output\""),
+                true,
+                null,
+                1,
+                Map.of(),
+                null,
+                null));
+        UUID executionId = executionService.triggerManual(job.getId(), organization.getId()).id();
+
+        Execution execution = awaitCompletion(executionId);
+
+        assertThat(execution.getStatus()).isEqualTo(ExecutionStatus.SUCCESS);
+        assertThat(execution.getExitCode()).isEqualTo(0);
+
+        List<String> stdout = executionLogRepository.findByExecution_IdOrderByIdAsc(executionId).stream()
+                .filter(log -> log.getStream() == LogStream.STDOUT)
+                .map(com.runway.api.executions.ExecutionLog::getMessage)
+                .toList();
+        assertThat(stdout).contains("pipeline-output");
     }
 
     @Test

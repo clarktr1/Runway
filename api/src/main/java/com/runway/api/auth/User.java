@@ -39,6 +39,14 @@ public class User {
         this.createdAt = Instant.now();
     }
 
+    public void updateEmail(String email) {
+        this.email = email;
+    }
+
+    public void updatePasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
     public UUID getId() {
         return id;
     }

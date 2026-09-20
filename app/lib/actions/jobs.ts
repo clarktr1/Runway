@@ -17,7 +17,12 @@ function buildJobRequest(formData: FormData) {
   const configuration =
     type === "HTTP"
       ? { method: String(formData.get("method") ?? ""), url: String(formData.get("url") ?? "") }
-      : { command: String(formData.get("command") ?? "") };
+      : type === "SSH_COMMAND"
+        ? {
+            remoteHostId: String(formData.get("remoteHostId") ?? ""),
+            command: String(formData.get("command") ?? ""),
+          }
+        : { command: String(formData.get("command") ?? "") };
 
   const timeoutSeconds = String(formData.get("timeoutSeconds") ?? "").trim();
   const cronExpression = String(formData.get("cronExpression") ?? "").trim();

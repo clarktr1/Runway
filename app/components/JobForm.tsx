@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import type { Job, JobType } from "@/app/lib/types";
+import type { Job, JobType, RemoteHost } from "@/app/lib/types";
 import type { JobFormState } from "@/app/lib/actions/jobs";
 import { ScheduleField } from "@/app/components/ScheduleField";
 
@@ -10,15 +10,21 @@ type JobFormProps = {
   submitLabel: string;
   initialValues?: Job;
   confirmMessage?: string;
+  remoteHosts?: RemoteHost[];
 };
 
-export function JobForm({ action, submitLabel, initialValues, confirmMessage }: JobFormProps) {
+export function JobForm({ action, submitLabel, initialValues, confirmMessage, remoteHosts = [] }: JobFormProps) {
   const [state, formAction, pending] = useActionState<JobFormState, FormData>(action, undefined);
   const [type, setType] = useState<JobType>(initialValues?.type ?? "SHELL");
 
-  const command = initialValues?.type === "SHELL" ? String(initialValues.configuration.command ?? "") : "";
+  const command =
+    initialValues?.type === "SHELL" || initialValues?.type === "SSH_COMMAND"
+      ? String(initialValues.configuration.command ?? "")
+      : "";
   const method = initialValues?.type === "HTTP" ? String(initialValues.configuration.method ?? "GET") : "GET";
   const url = initialValues?.type === "HTTP" ? String(initialValues.configuration.url ?? "") : "";
+  const remoteHostId =
+    initialValues?.type === "SSH_COMMAND" ? String(initialValues.configuration.remoteHostId ?? "") : "";
 
   const retryPolicy = initialValues?.retryPolicy ?? {};
   const maxAttempts = Number(retryPolicy.maxAttempts ?? 1);
@@ -68,10 +74,11 @@ export function JobForm({ action, submitLabel, initialValues, confirmMessage }: 
         >
           <option value="SHELL">Shell Command</option>
           <option value="HTTP">HTTP Request</option>
+          <option value="SSH_COMMAND">SSH Command</option>
         </select>
       </label>
 
-      {type === "SHELL" ? (
+      {type === "SHELL" && (
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">Command</span>
           <input
@@ -85,7 +92,9 @@ export function JobForm({ action, submitLabel, initialValues, confirmMessage }: 
             <span className="text-sm text-red-600">{state.fieldErrors["configuration.command"]}</span>
           )}
         </label>
-      ) : (
+      )}
+
+      {type === "HTTP" && (
         <div className="flex gap-3">
           <label className="flex w-32 flex-col gap-1">
             <span className="text-sm font-medium">Method</span>
@@ -114,6 +123,51 @@ export function JobForm({ action, submitLabel, initialValues, confirmMessage }: 
             )}
           </label>
         </div>
+      )}
+
+      {type === "SSH_COMMAND" && (
+        <>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Remote Host</span>
+            <select
+              name="remoteHostId"
+              defaultValue={remoteHostId}
+              required
+              className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 focus:border-primary focus:outline-none"
+            >
+              <option value="" disabled>
+                Select a remote host
+              </option>
+              {remoteHosts.map((host) => (
+                <option key={host.id} value={host.id}>
+                  {host.name} ({host.hostname})
+                </option>
+              ))}
+            </select>
+            {state?.fieldErrors?.["configuration.remoteHostId"] && (
+              <span className="text-sm text-red-600">{state.fieldErrors["configuration.remoteHostId"]}</span>
+            )}
+            {remoteHosts.length === 0 && (
+              <span className="text-sm text-foreground/60">
+                No remote hosts yet — add one from the Account page first.
+              </span>
+            )}
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Command</span>
+            <textarea
+              name="command"
+              defaultValue={command}
+              required
+              rows={3}
+              placeholder="/opt/deploy.sh"
+              className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 font-mono text-sm focus:border-primary focus:outline-none"
+            />
+            {state?.fieldErrors?.["configuration.command"] && (
+              <span className="text-sm text-red-600">{state.fieldErrors["configuration.command"]}</span>
+            )}
+          </label>
+        </>
       )}
 
       <ScheduleField initialValue={initialValues?.cronExpression ?? ""} />

@@ -114,4 +114,127 @@ class JobControllerTest {
                         .content(body))
                 .andExpect(status().isBadRequest());
     }
+
+    @Test
+    void createsAnSshCommandJobAgainstAnOwnedRemoteHost() throws Exception {
+        String remoteHostId = createRemoteHost(token);
+
+        String body = objectMapper.writeValueAsString(Map.of(
+                "name",
+                "Deploy Script",
+                "type",
+                "SSH_COMMAND",
+                "configuration",
+                Map.of("remoteHostId", remoteHostId, "command", "/opt/deploy.sh"),
+                "enabled",
+                true,
+                "maxConcurrency",
+                1));
+
+        mockMvc.perform(post("/api/jobs")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.type").value("SSH_COMMAND"));
+    }
+
+    @Test
+    void rejectsAnSshCommandJobMissingItsRemoteHostId() throws Exception {
+        String body = objectMapper.writeValueAsString(Map.of(
+                "name",
+                "Broken SSH Job",
+                "type",
+                "SSH_COMMAND",
+                "configuration",
+                Map.of("command", "/opt/deploy.sh"),
+                "enabled",
+                true,
+                "maxConcurrency",
+                1));
+
+        mockMvc.perform(post("/api/jobs")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void rejectsAnSshCommandJobReferencingAnotherOrganizationsRemoteHost() throws Exception {
+        String otherOrgToken = registerAndGetToken("ssh-job-other-org-" + System.nanoTime() + "@runway.dev");
+        String otherOrgHostId = createRemoteHost(otherOrgToken);
+
+        String body = objectMapper.writeValueAsString(Map.of(
+                "name",
+                "Cross Org SSH Job",
+                "type",
+                "SSH_COMMAND",
+                "configuration",
+                Map.of("remoteHostId", otherOrgHostId, "command", "/opt/deploy.sh"),
+                "enabled",
+                true,
+                "maxConcurrency",
+                1));
+
+        mockMvc.perform(post("/api/jobs")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    private String registerAndGetToken(String email) throws Exception {
+        String body = objectMapper.writeValueAsString(
+                Map.of("name", "Job Tester", "email", email, "password", "correct-horse-battery"));
+        String response = mockMvc
+                .perform(post("/api/auth/register").contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return objectMapper.readTree(response).get("token").asString();
+    }
+
+    private String createRemoteHost(String authToken) throws Exception {
+        String privateKey =
+                """
+                -----BEGIN OPENSSH PRIVATE KEY-----
+                b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+                QyNTUxOQAAACBhcQqEXXrBSLaF6QmSVbHtU7gu/aub9/ik7pivAwCiBgAAAJhstTV+bLU1
+                fgAAAAtzc2gtZWQyNTUxOQAAACBhcQqEXXrBSLaF6QmSVbHtU7gu/aub9/ik7pivAwCiBg
+                AAAED+G5biVjxsRt2rGCaDzNCtrNXgCw3RvgTwAeJuXTIeEWFxCoRdesFItoXpCZJVse1T
+                uC79q5v3+KTumK8DAKIGAAAAD3J1bndheS10ZXN0LWtleQECAwQFBg==
+                -----END OPENSSH PRIVATE KEY-----
+                """;
+        String credentialBody =
+                objectMapper.writeValueAsString(Map.of("name", "Deploy Key", "privateKey", privateKey));
+        String credentialResponse = mockMvc
+                .perform(post("/api/ssh-credentials")
+                        .header("Authorization", "Bearer " + authToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(credentialBody))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String credentialId = objectMapper.readTree(credentialResponse).get("id").asString();
+
+        String hostBody = objectMapper.writeValueAsString(Map.of(
+                "name", "Web Server",
+                "hostname", "example.internal",
+                "port", 22,
+                "username", "deploy",
+                "sshCredentialId", credentialId));
+        String hostResponse = mockMvc
+                .perform(post("/api/remote-hosts")
+                        .header("Authorization", "Bearer " + authToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(hostBody))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return objectMapper.readTree(hostResponse).get("id").asString();
+    }
 }

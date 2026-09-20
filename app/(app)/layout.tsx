@@ -18,7 +18,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </nav>
         </div>
         <div className="flex items-center gap-4 text-sm text-foreground/60">
-          <span>{session.email}</span>
+          <Link href="/account" title="Account settings" className="underline hover:text-foreground">
+            {session.email}
+          </Link>
           <form action={logoutAction}>
             <button type="submit" className="underline">
               Log out
