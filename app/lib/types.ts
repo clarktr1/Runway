@@ -107,3 +107,31 @@ export type TestConnectionResult = {
   newlyPinned: boolean;
   errorMessage: string | null;
 };
+
+// What the API will run for a demo job. Prose about each demo lives in demoJobs.ts.
+export type DemoJobDefinition = {
+  id: string;
+  timeoutSeconds: number | null;
+  retryPolicy: {
+    maxAttempts: number;
+    strategy: "FIXED" | "EXPONENTIAL";
+    initialDelaySeconds: number;
+    maxDelaySeconds: number;
+  };
+} & (
+  | { type: "SHELL"; configuration: { command: string } }
+  | {
+      type: "HTTP";
+      configuration: { method: string; url: string; headers?: Record<string, string>; body?: string };
+    }
+);
+
+export type DemoRunStatus = {
+  status: ExecutionStatus;
+  attempt: number;
+  maxAttempts: number;
+  exitCode: number | null;
+  errorMessage: string | null;
+  durationMs: number | null;
+  retryInSeconds: number | null;
+};

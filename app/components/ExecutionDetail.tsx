@@ -6,7 +6,7 @@ import type { Execution, ExecutionLog } from "@/app/lib/types";
 import { RetryExecutionButton } from "@/app/components/RetryExecutionButton";
 import { CancelExecutionButton } from "@/app/components/CancelExecutionButton";
 
-const STATUS_COLORS: Record<Execution["status"], string> = {
+export const STATUS_COLORS: Record<Execution["status"], string> = {
   QUEUED: "text-foreground/60",
   RUNNING: "text-blue-600",
   SUCCESS: "text-green-600",
@@ -20,7 +20,7 @@ const RETRYABLE_STATUSES: Execution["status"][] = ["FAILED", "TIMEOUT", "CANCELL
 const CANCELLABLE_STATUSES: Execution["status"][] = ["QUEUED", "RUNNING"];
 const TERMINAL_STATUSES: Execution["status"][] = ["SUCCESS", "FAILED", "TIMEOUT", "CANCELLED"];
 
-const STREAM_COLORS: Record<ExecutionLog["stream"], string> = {
+export const STREAM_COLORS: Record<ExecutionLog["stream"], string> = {
   STDOUT: "text-gray-100",
   STDERR: "text-red-400",
   SYSTEM: "text-gray-400",

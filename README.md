@@ -1,5 +1,10 @@
 # Runway
 
+[![CI](https://github.com/clarktr1/Runway/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/clarktr1/Runway/actions/workflows/ci.yml)
+
+**Live app:** [runway-ri1u.onrender.com](https://runway-ri1u.onrender.com) ·
+[try the demo](https://runway-ri1u.onrender.com/demo), no account needed
+
 Runway is a self-hosted job scheduling and execution platform: cron-based
 scheduling, manual triggers, retries, timeouts, concurrency limits, live
 execution logs, and distributed workers — including running commands on
@@ -25,6 +30,10 @@ yet.
 - **SSH remote execution**: paste a private key, register a remote host,
   verify its host key once (trust-on-first-use, pinned), then run commands
   on it through the same scheduling/retry/history pipeline as any other job
+- **Demo**: a public, read-only page of ready-made jobs (HTTP GET/POST against
+  httpbin.org, live shell output, retries, timeouts) that anyone can read
+  about and run with one click. No account is created; the output streams
+  live inside each job's card
 - **Auth**: JWT-based sessions, organization-scoped data, self-service
   account management (change email/password)
 
@@ -180,6 +189,12 @@ pull request against `main`.
   as the API (toggle: `runway.scheduler.enabled` / `runway.worker.enabled`).
   Scaling out today means running more replicas of the `api` image, not a
   separate `worker` image.
+- **Demo runs are anonymous and never stored.** `/api/demo/**` is the only
+  unauthenticated part of the API. It runs a fixed catalog of jobs directly on
+  the real executors and retry policy and streams the output back over SSE:
+  no account, no token, no job or execution rows, and no queue or worker
+  involved. A visitor can't create or change a job through it, and closing the
+  page cancels the run.
 - **SSH host-key trust is pinned only on an explicit action.** A scheduled
   job never establishes trust on its own — `POST /api/remote-hosts/{id}/test-connection`
   is the only way a host's fingerprint gets pinned. A job against an
@@ -199,6 +214,11 @@ Not yet built, tracked against [`design/full_spec.md`](design/full_spec.md):
 - No API keys, audit logging, or container/workflow job types
 - No dashboard charts (the spec calls for Recharts; not wired up yet)
 - SSE fan-out is single-JVM — no cross-instance broadcast
+- The demo endpoints (`/api/demo/**`) are unauthenticated. They can only run
+  the five jobs fixed in code, but they are limited by a global cap of 5
+  concurrent runs rather than a per-client rate limit, and the shell demo runs
+  `sh -c` on the API host, so keep that in mind before exposing an instance
+  publicly
 - No cloud/Terraform deployment — Docker Compose only
 
 ## Project structure
