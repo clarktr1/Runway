@@ -33,6 +33,13 @@ services:
     dockerfilePath: ./api/Dockerfile
     dockerContext: ./api
     envVars:
+      # Render assumes port 10000 unless told otherwise, and didn't
+      # auto-detect that this one's different. Spring Boot's own default is
+      # 8080 (api/Dockerfile EXPOSEs it, application.properties doesn't
+      # override it) — this just tells Render to expect that port too, so
+      # it advertises it correctly to runway-web via fromService below.
+      - key: PORT
+        value: "8080"
       - key: DB_HOST
         fromDatabase:
           name: runway-postgres
