@@ -73,6 +73,11 @@ services:
 
   - name: runway-redis
     type: keyvalue
+    # Empty on purpose: this only gates the instance's external URL, which
+    # nothing needs — runway-api reaches it over the private network, which
+    # ipAllowList doesn't affect either way. Render's blueprint validator
+    # requires the field to be present even to say "no external access."
+    ipAllowList: []
     # This is a job queue (a Redis list), not a cache — an eviction policy
     # that drops keys under memory pressure would silently drop queued work.
     maxmemoryPolicy: noeviction
