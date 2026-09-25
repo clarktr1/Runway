@@ -2,8 +2,7 @@
 
 [![CI](https://github.com/clarktr1/Runway/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/clarktr1/Runway/actions/workflows/ci.yml)
 
-**Live app:** [runway-ri1u.onrender.com](https://runway-ri1u.onrender.com) ·
-[try the demo](https://runway-ri1u.onrender.com/demo), no account needed
+**Live app:** https://runway-web.onrender.com, no account needed
 
 Runway is a self-hosted job scheduling and execution platform: cron-based
 scheduling, manual triggers, retries, timeouts, concurrency limits, live
