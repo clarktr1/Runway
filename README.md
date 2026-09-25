@@ -112,6 +112,22 @@ npm run dev
 before running this anywhere but your own machine** — `docker-compose.yml`
 doesn't set them, so containers run on the checked-in dev defaults as-is.
 
+### Deploying to Render
+
+Runway is two separate services plus Postgres and Redis — not one container.
+The Next.js web app has no Java in it (see `Dockerfile`), so it needs the
+Spring Boot API (`api/Dockerfile`) running as its own service to talk to.
+
+[`render.yaml`](render.yaml) defines all four as a
+[Render Blueprint](https://render.com/docs/blueprint-spec): push it to your
+repo, then in Render choose **New > Blueprint** and point it at the repo.
+Everything is wired automatically except one manual step: after the first
+deploy, open the `runway-api` service's Environment tab and set
+`RUNWAY_CREDENTIALS_KEY` to the output of `openssl rand -base64 32` — it
+can't be generated automatically because it must decode to exactly 32 bytes,
+and the blueprint deliberately leaves it unset (`sync: false`) rather than
+put an insecure default in front of anyone with the repo.
+
 ## Example: creating and running a job
 
 ```bash

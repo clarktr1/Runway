@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
+import { resolveApiUrl } from "@/app/lib/api";
 import { getSessionToken } from "@/app/lib/session";
 
 export const dynamic = "force-dynamic";
 
-const API_URL = process.env.RUNWAY_API_URL ?? "http://localhost:8080";
+const API_URL = resolveApiUrl();
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

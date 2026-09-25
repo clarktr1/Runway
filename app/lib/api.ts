@@ -1,7 +1,16 @@
 import "server-only";
 import { getSessionToken } from "@/app/lib/session";
 
-const API_URL = process.env.RUNWAY_API_URL ?? "http://localhost:8080";
+// RUNWAY_API_URL is usually a full URL (e.g. from a .env file), but on a
+// platform that wires services together by host:port on a private network
+// (Render's fromService, for one) it may arrive with no scheme. Treat that
+// as http, since that's what such networks carry internally.
+export function resolveApiUrl() {
+  const value = process.env.RUNWAY_API_URL ?? "http://localhost:8080";
+  return value.includes("://") ? value : `http://${value}`;
+}
+
+const API_URL = resolveApiUrl();
 
 export class ApiError extends Error {
   status: number;
