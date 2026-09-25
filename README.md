@@ -102,7 +102,7 @@ npm run dev
 
 | Variable                                  | Default (dev only)                | Used by |
 | ------------------------------------------ | ----------------------------------- | ------- |
-| `DB_HOST` / `DB_USERNAME` / `DB_PASSWORD`   | `localhost` / `runway` / `runway`   | api     |
+| `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USERNAME` / `DB_PASSWORD` | `localhost` / `5432` / `runway` / `runway` / `runway` | api |
 | `REDIS_HOST` / `REDIS_PORT`                 | `localhost` / `6379`                | api     |
 | `RUNWAY_JWT_SECRET`                         | insecure dev default                | api     |
 | `RUNWAY_CREDENTIALS_KEY`                    | insecure dev default (32-byte base64 AES key) | api — encrypts SSH private keys at rest |

@@ -49,6 +49,13 @@ services:
         fromDatabase:
           name: runway-postgres
           property: password
+      # The app's own default ("runway") is only a coincidence with the
+      # `databaseName` set below in `databases:` — read it from Render
+      # rather than assume the two stay in sync.
+      - key: DB_NAME
+        fromDatabase:
+          name: runway-postgres
+          property: database
       - key: REDIS_HOST
         fromService:
           name: runway-redis
