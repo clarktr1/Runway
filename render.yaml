@@ -1,0 +1,83 @@
+# Render Blueprint for Runway: https://render.com/docs/blueprint-spec
+#
+# Defines four resources — the web app, the API, Postgres, and a Key Value
+# (Redis-compatible) store — wired together the same way as
+# docker-compose.yml. Deploy: push this file to your repo, then in Render
+# choose "New > Blueprint" and point it at the repo.
+#
+# One manual step after the first deploy: set RUNWAY_CREDENTIALS_KEY on
+# runway-api (see the comment on that var below) — it can't be generated
+# automatically because it must be an exact-length key.
+#
+# `plan` is left unset throughout; Render will ask you to choose one for
+# each resource when you create them from this blueprint.
+
+services:
+  - name: runway-web
+    type: web
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      # No scheme here — resolveApiUrl() in app/lib/api.ts adds "http://".
+      # Private services on Render communicate over plain HTTP internally.
+      - key: RUNWAY_API_URL
+        fromService:
+          name: runway-api
+          type: pserv
+          property: hostport
+
+  - name: runway-api
+    type: pserv
+    runtime: docker
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: ./api
+    envVars:
+      - key: DB_HOST
+        fromDatabase:
+          name: runway-postgres
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: runway-postgres
+          property: port
+      - key: DB_USERNAME
+        fromDatabase:
+          name: runway-postgres
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: runway-postgres
+          property: password
+      - key: REDIS_HOST
+        fromService:
+          name: runway-redis
+          type: keyvalue
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          name: runway-redis
+          type: keyvalue
+          property: port
+      - key: RUNWAY_JWT_SECRET
+        generateValue: true
+      # Must decode from base64 to exactly 32 bytes (AES-256-GCM) or the API
+      # refuses to start — generateValue's output isn't guaranteed to fit
+      # that shape, so set this by hand instead:
+      #   openssl rand -base64 32
+      # Paste the result into this service's Environment tab in the Render
+      # dashboard; sync: false just keeps Render from overwriting it on the
+      # next blueprint sync.
+      - key: RUNWAY_CREDENTIALS_KEY
+        sync: false
+
+  - name: runway-redis
+    type: keyvalue
+    # This is a job queue (a Redis list), not a cache — an eviction policy
+    # that drops keys under memory pressure would silently drop queued work.
+    maxmemoryPolicy: noeviction
+
+databases:
+  - name: runway-postgres
+    databaseName: runway
+    user: runway

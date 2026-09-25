@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
+import { resolveApiUrl } from "@/app/lib/api";
 
 export const dynamic = "force-dynamic";
 
-const API_URL = process.env.RUNWAY_API_URL ?? "http://localhost:8080";
+const API_URL = resolveApiUrl();
 
 // Public on purpose: the API only runs its own fixed demo jobs here, so no
 // session or token is involved.
