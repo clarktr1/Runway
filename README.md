@@ -2,7 +2,6 @@
 
 [![CI](https://github.com/clarktr1/Runway/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/clarktr1/Runway/actions/workflows/ci.yml)
 
-**Live app:** https://runway-web.onrender.com, no account needed
 
 Runway is a self-hosted job scheduling and execution platform: cron-based
 scheduling, manual triggers, retries, timeouts, concurrency limits, live
@@ -235,6 +234,8 @@ Not yet built, tracked against [`design/full_spec.md`](design/full_spec.md):
   `sh -c` on the API host, so keep that in mind before exposing an instance
   publicly
 - No cloud/Terraform deployment — Docker Compose only
+
+* You assume the risks of using this application. 
 
 ## Project structure
 
